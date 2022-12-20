@@ -101,20 +101,32 @@ class uti690B():
             clean_image_list.append(image_bw)
         return(clean_image_list)
 
+    def calculate_temp_grey_levels(self, max_val,min_val, contrast_img):
+        logging.debug("calculate_temp_grey_levels()")
+        logging.debug("max_val = " + str(max_val))
+        logging.debug("min_val = " + str(min_val))
+
+        # 1. map the min_val to the lower value
+        # 2. map the max_val to the higher value
+
+
     def save_images(self, image_list):
         for i in range(len(image_list)):
             im_name = "test_images/im" + str(i) + ".png"
             cv2.imwrite(im_name,image_list[i])
 
     def get_values_from_images(self, image_list):
+        values = []
         for image in image_list:
-            logging.debug("Showing image to be processed")
-            cv2.imshow('Image',image)
-            cv2.waitKey()
+            #logging.debug("Showing image to be processed")
+            #cv2.imshow('Image',image)
+            #cv2.waitKey()
             text = pytesseract.image_to_string(image, config="--psm 8")             # read tesseract manual page, configuration for image as single word.
             print('"' + text + '"')
-
-        return(image_list)
+            #val = float(text)
+            values.append(text)
+        logging.debug(values)
+        return(values)
 
     def get_max_temp(self):             # finds max temp
         pass
