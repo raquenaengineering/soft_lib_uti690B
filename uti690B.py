@@ -11,7 +11,18 @@ import pytesseract
 pytesseract.pytesseract.tesseract_cmd = "C:\Program Files\Tesseract-OCR\\tesseract.exe"
 
 separator = "*************************************************************************"
+
 class uti690B():
+
+    # coordinates of the blocks to be further processed #
+    center_temp_block = [0,40,0,120]
+    max_temp_block = [35,55,196,250]
+    min_temp_block = [253,275,196,250]
+    contrast_block = [58,253,226,234]
+    # coordinates of blocks to remove #
+    date_block = None
+    time_block = None
+    battery_block = None
 
 
 
@@ -121,23 +132,53 @@ class uti690B():
         Splits image in different parts, required for further processing
         :return:
         """
-        center_temp_img = image[0:40,0:120]
-        cv2.imwrite("test_images/center_temp.png", center_temp_img)
-        max_temp_img = image[35:55,196:250]
-        cv2.imwrite("test_images/max_temp.png", max_temp_img)
-        min_temp_img = image[254:274,196:250]
-        cv2.imwrite("test_images/min_temp.png", min_temp_img)
-        contrast_img = image[58:253,226:234]
-        cv2.imwrite("test_images/contrast.png", contrast_img)
 
-        return([center_temp_img,max_temp_img,min_temp_img,contrast_img])
+        rest_img = image.copy()
+        # center #
+        center_temp_img = image[
+                          self.center_temp_block[0]:self.center_temp_block[1],
+                          self.center_temp_block[2]:self.center_temp_block[3]]
+        rest_img[0:40,0:120] = 0
+        cv2.imwrite("test_images/center_temp.png", center_temp_img)
+        # max #
+        max_temp_img = image[
+                       self.max_temp_block[0]:self.max_temp_block[1],
+                       self.max_temp_block[2]:self.max_temp_block[3]]
+        rest_img[35:55,196:250] = 0
+        cv2.imwrite("test_images/max_temp.png", max_temp_img)
+        # min #
+        min_temp_img = image[
+                       self.min_temp_block[0]:self.min_temp_block[1],
+                       self.min_temp_block[2]:self.min_temp_block[3]]
+        rest_img[
+                self.min_temp_block[0]:self.min_temp_block[1],
+                self.min_temp_block[2]:self.min_temp_block[3]
+                ] = 0
+
+        cv2.imwrite("test_images/min_temp.png", min_temp_img)
+        # contrast bar #
+        contrast_img = image[
+                       self.contrast_block[0]:self.contrast_block[1],
+                       self.contrast_block[2]:self.contrast_block[3]]
+        rest_img[58:253,226:234] = 0
+        cv2.imwrite("test_images/contrast.png", contrast_img)
+        # rest #
+        cv2.imwrite("test_images/rest.png", rest_img)
+
+
+
+        return([center_temp_img,max_temp_img,min_temp_img,contrast_img, rest_img])
+
+    def clean_image(self, image):
+        image_g = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        retval, image_bw = cv2.threshold(image_g, 180, 255,cv2.THRESH_BINARY)  # returns a fucking tuple, where the fuck is this explained?
+        return(image_bw)
 
     def clean_images(self, image_list):
         clean_image_list = []
         for image in image_list:
-            image_g = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-            aaa, image_bw = cv2.threshold(image_g, 180, 255, cv2.THRESH_BINARY)      # returns a fucking tuple, where the fuck is this explained?
-            clean_image_list.append(image_bw)
+            image_clean = self.clean_image(image)
+            clean_image_list.append(image_clean)
         return(clean_image_list)
 
     def calculate_temp_grey_levels(self, max_val,min_val, contrast_img):
@@ -153,29 +194,38 @@ class uti690B():
             im_name = "test_images/im" + str(i) + ".png"
             cv2.imwrite(im_name,image_list[i])
 
-    def get_values_from_images(self, image_list):
-        values = []
-        for image in image_list:
-            #logging.debug("Showing image to be processed")
-            #cv2.imshow('Image',image)
-            #cv2.waitKey()
-            text = pytesseract.image_to_string(image, config="--psm 8")             # read tesseract manual page, configuration for image as single word.
-            print('"' + text + '"')
-            #val = float(text)
-            values.append(text)
-        logging.debug(values)
-        return(values)
+    # def get_values_from_images(self, image_list):
+    #     values = []
+    #     for image in image_list:
+    #         #logging.debug("Showing image to be processed")
+    #         #cv2.imshow('Image',image)
+    #         #cv2.waitKey()
+    #         text = pytesseract.image_to_string(image, config="--psm 8")             # read tesseract manual page, configuration for image as single word.
+    #         print('"' + text + '"')
+    #         #val = float(text)
+    #         values.append(text)
+    #     logging.debug(values)
+    #     return(values)
+
+
+    def get_val(self, image):
+        val_im_str = pytesseract.image_to_string(image,config="--psm 8")  # read tesseract manual page, configuration for image as single word.
+        try:
+            val = float(val_im_str)
+        except:
+            logging.error("Value couldn't be converted to a float")
+            val = None
+
+        return(val)
 
     def get_max_temp(self):             # finds max temp
-        retval = False
-        max_temp_im = cv2.imread("test_images/max_temp.png")
-        max_temp = pytesseract.image_to_string(max_temp_im,config="--psm 8")  # read tesseract manual page, configuration for image as single word.
+        max_temp_im = cv2.imread("test_images/im1.png")
+        max_temp = self.get_val(max_temp_im)
         return(max_temp)
 
     def get_min_temp(self):             # min temp
-        retval = False
-        min_temp_im = cv2.imread("test_images/min_temp.png")
-        min_temp = pytesseract.image_to_string(min_temp_im,config="--psm 8")  # read tesseract manual page, configuration for image as single word.
+        min_temp_im = cv2.imread("test_images/im2.png")
+        min_temp = self.get_val(min_temp_im)
         return(min_temp)
 
     def test(self):
@@ -186,9 +236,9 @@ class uti690B():
         # else:
         #     print("No UTI cameras were found")
 
-        camera_found = self.find_camera()                                  # finding the camera
+        # camera_found = self.find_camera()                                  # finding the camera
 
-        if (camera_found):
+        if (self.camera_n != None):
             img = self.take_snapshot()
             images = self.split_image(img)
             images_clean = self.clean_images(images)
@@ -199,7 +249,8 @@ class uti690B():
             min_temp = self.get_min_temp()
             print("Minimum temperature value: " + str(min_temp))
         else:
-            print("NO CAMERA FOUND: Couldn't proceed with the testing")
+            print("NO CAMERA AVAILABLE: Couldn't proceed with the testing")
+            print("use 'find' command to find a camera, if it fails, check your connections")
 
 if __name__ == "__main__":
     thermal_cam = uti690B()
